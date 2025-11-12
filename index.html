@@ -3,20 +3,43 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Моя геопозиція</title>
+  <title>Геопозиції з карти</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin: 20px; }
+    #map { height: 70vh; width: 100%; margin-top: 20px; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    #status { margin-top: 10px; font-weight: bold; }
+  </style>
 </head>
-<body style="font-family:sans-serif;text-align:center;margin-top:50px;">
+<body>
   <h2>Додати поточну геопозицію</h2>
-  <button onclick="sendLocation()" style="padding:10px 20px;font-size:16px;">📍 Додати позицію</button>
+  <button onclick="sendLocation()">📍 Додати позицію</button>
   <p id="status"></p>
+  <div id="map"></div>
+
+  <!-- API Key подставляется динамически через Apps Script -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=<?= apiKey ?>"></script>
 
   <script>
-    const scriptURL = "https://script.google.com/macros/s/AKfycbxpp-yPCe1f3AA8V7BiZPBQdKEWP4SNqYbYVVICcAdbLnggvClaNitvZM-aaDEWkUjOFA/exec";
+    const scriptURL = "<?= ScriptApp.getService().getUrl() ?>"; // Apps Script /exec
+    const sheetURL = "<?= ScriptApp.getService().getUrl() ?>?action=getPoints";
+    let map;
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 0, lng: 0 },
+        zoom: 2
+      });
+      loadPoints();
+      setInterval(loadPoints, 30000);
+    }
 
     function sendLocation() {
-      document.getElementById("status").textContent = "Отримую координати...";
+      const status = document.getElementById("status");
+      status.textContent = "Отримую координати...";
       if (!navigator.geolocation) {
-        return document.getElementById("status").textContent = "Геолокація не підтримується.";
+        status.textContent = "Геолокація не підтримується.";
+        return;
       }
       navigator.geolocation.getCurrentPosition(pos => {
         const data = {
@@ -26,15 +49,39 @@
         };
         fetch(scriptURL, {
           method: "POST",
-          mode: "no-cors",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data)
-        });
-        document.getElementById("status").textContent = "✅ Позицію додано!";
+        })
+        .then(() => { status.textContent = "✅ Позицію додано!"; loadPoints(); })
+        .catch(err => { status.textContent = "❌ Помилка: " + err; });
       }, err => {
-        document.getElementById("status").textContent = "Помилка: " + err.message;
+        status.textContent = "Помилка: " + err.message;
       });
     }
+
+    function loadPoints() {
+      fetch(sheetURL)
+        .then(r => r.json())
+        .then(points => {
+          if (window.markers) window.markers.forEach(m => m.setMap(null));
+          window.markers = [];
+          points.forEach(p => {
+            const marker = new google.maps.Marker({
+              position: { lat: Number(p.lat), lng: Number(p.lon) },
+              map: map,
+              title: p.note
+            });
+            window.markers.push(marker);
+          });
+          if (points.length > 0) {
+            map.setCenter({ lat: Number(points[0].lat), lng: Number(points[0].lon) });
+            map.setZoom(8);
+          }
+        })
+        .catch(err => console.error("Ошибка загрузки точек:", err));
+    }
+
+    window.onload = initMap;
   </script>
 </body>
 </html>
