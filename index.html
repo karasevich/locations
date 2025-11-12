@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Моя геопозиція</title>
+</head>
+<body style="font-family:sans-serif;text-align:center;margin-top:50px;">
+  <h2>Додати поточну геопозицію</h2>
+  <button onclick="sendLocation()" style="padding:10px 20px;font-size:16px;">📍 Додати позицію</button>
+  <p id="status"></p>
+
+  <script>
+    const scriptURL = "https://script.google.com/macros/s/AKfycbxpp-yPCe1f3AA8V7BiZPBQdKEWP4SNqYbYVVICcAdbLnggvClaNitvZM-aaDEWkUjOFA/exec";
+
+    function sendLocation() {
+      document.getElementById("status").textContent = "Отримую координати...";
+      if (!navigator.geolocation) {
+        return document.getElementById("status").textContent = "Геолокація не підтримується.";
+      }
+      navigator.geolocation.getCurrentPosition(pos => {
+        const data = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          note: "З телефону"
+        };
+        fetch(scriptURL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+        document.getElementById("status").textContent = "✅ Позицію додано!";
+      }, err => {
+        document.getElementById("status").textContent = "Помилка: " + err.message;
+      });
+    }
+  </script>
+</body>
+</html>
